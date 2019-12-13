@@ -30,7 +30,7 @@ spec:
         - |
           echo "pre-deploy success!!"
     - name: deploy
-      image: registry.cn-hangzhou.aliyuncs.com/knative-sample/deployer:master_c367a24a-20191213155723
+      image: registry.cn-hangzhou.aliyuncs.com/knative-sample/deployer:master_0f27a4dc-20191213170052
       command:
       - /deployer
       args:
