@@ -1,0 +1,8 @@
+FROM registry.cn-hangzhou.aliyuncs.com/knative-sample/golang:1.13-alpine3.10 as builder
+WORKDIR /go/src/github.com/knative-sample/tekton-triggers-tools/
+COPY . .
+RUN CGO_ENABLED=0 go build -v -o bin/deployer cmd/deployer//main.go
+
+FROM registry.cn-hangzhou.aliyuncs.com/knative-sample/alpine:3.10.3
+COPY --from=builder /go/src/github.com/knative-sample/tekton-triggers-tools/bin/deployer .
+ENTRYPOINT ["/deployer"]
