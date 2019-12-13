@@ -1,8 +1,10 @@
 FROM registry.cn-hangzhou.aliyuncs.com/knative-sample/golang:1.13-alpine3.10 as builder
 WORKDIR /go/src/github.com/knative-sample/tekton-triggers-tools/
-COPY . .
-RUN CGO_ENABLED=0 go build -v -o bin/trigger-gateway cmd/gateway/main.go
+COPY cmd/ cmd
+COPY pkg/ pkg
+COPY vendor/ vendor
+RUN CGO_ENABLED=0 go build -v -o bin/gateway cmd/gateway/main.go
 
-FROM registry.cn-hangzhou.aliyuncs.com/knative-sample/alpine:3.10.3
-COPY --from=builder /go/src/github.com/knative-sample/tekton-triggers-tools/bin/trigger-gateway .
-ENTRYPOINT ["/trigger-gateway"]
+FROM registry.cn-hangzhou.aliyuncs.com/knative-sample/alpine:3.10.3 
+COPY --from=builder /go/src/github.com/knative-sample/tekton-triggers-tools/bin/gateway .
+ENTRYPOINT ["/gateway"]

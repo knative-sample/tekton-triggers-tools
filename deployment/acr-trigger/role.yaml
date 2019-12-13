@@ -1,0 +1,50 @@
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: tekton-triggers-role
+rules:
+- apiGroups:
+  - tekton.dev
+  resources:
+  - eventlisteners
+  - triggerbindings
+  - triggertemplates
+  - pipelineruns
+  - pipelineresources
+  - tasks
+  - taskruns
+  verbs:
+  - get
+  - create
+  - update
+  - patch
+- apiGroups:
+  - serving.knative.dev
+  resources:
+  - services
+  verbs:
+  - get
+  - create
+  - update
+  - patch
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tekton-trigger
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: tekton-triggers-role-binding
+subjects:
+  - kind: ServiceAccount
+    name: tekton-trigger
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: tekton-triggers-role
+

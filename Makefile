@@ -5,7 +5,7 @@ gateway:
 	go build -o bin/gateway cmd/gateway/main.go
 deployer:
 	@echo "build deployer"
-	go build -o bin/deployer cmd/deployer//main.go
+	go build -o bin/deployer cmd/deployer/main.go
 
 gateway-image:
 	@echo "release gateway image"

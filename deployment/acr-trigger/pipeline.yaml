@@ -1,0 +1,80 @@
+--- 
+apiVersion: tekton.dev/v1alpha1
+kind: Task
+metadata:
+  name: deploy
+  annotations:
+    sidecar.istio.io/inject: "false"
+spec:
+  inputs:
+    params:
+    - name: imageUrl
+      description: The image full url
+    - name: imageTag
+      description: The image tag
+    - name: imageDigest
+      description: The image digest
+    - name: namespace
+      description: The knative service namespace
+    - name: ksvcname
+      description: The knative service name
+    - name: imageDigest
+      description: The knative service image digest
+  steps:
+    - name: pre-deploy
+      image: registry.cn-hangzhou.aliyuncs.com/knative-sample/alpine:3.10.3
+      command:
+      - sh
+      args:
+        - -c
+        - |
+          echo "pre-deploy success!!"
+    - name: deploy
+      image: registry.cn-hangzhou.aliyuncs.com/knative-sample/deployer:master_c367a24a-20191213155723
+      command:
+      - /deployer
+      args:
+      - --image=$(inputs.params.imageUrl):$(inputs.params.imageTag)
+      - --ksvcname=$(inputs.params.ksvcname)
+      - --namespace=$(inputs.params.namespace)
+    - name: post-deploy
+      image: registry.cn-hangzhou.aliyuncs.com/knative-sample/alpine:3.10.3
+      command:
+      - sh
+      args:
+        - -c
+        - |
+          echo "post-deploy success!!"
+--- 
+apiVersion: tekton.dev/v1alpha1
+kind: Pipeline
+metadata:
+  name: acr-trigger-pipeline
+spec:
+  params:
+  - name: imageUrl
+    description: The image full url
+  - name: imageTag
+    description: The image tag
+  - name: imageDigest
+    description: The image digest
+  - name: namespace
+    description: The knative service namespace
+  - name: ksvcname
+    description: The knative service name
+  tasks:
+  - name: deploy
+    taskRef:
+      name: deploy
+    params:
+    - name: imageUrl
+      value: "$(params.imageUrl)"
+    - name: imageTag
+      value: "$(params.imageTag)"
+    - name: imageDigest
+      value: "$(params.imageDigest)"
+    - name: ksvcname
+      value: "$(params.ksvcname)"
+    - name: namespace
+      value: "$(params.namespace)"
+

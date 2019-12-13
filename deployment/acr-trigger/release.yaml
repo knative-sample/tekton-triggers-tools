@@ -1,0 +1,221 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cicd-system
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tekton-trigger
+  namespace: cicd-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: tekton-triggers-role
+rules:
+- apiGroups:
+  - tekton.dev
+  resources:
+  - eventlisteners
+  - triggerbindings
+  - triggertemplates
+  - pipelineruns
+  - pipelineresources
+  - tasks
+  - taskruns
+  verbs:
+  - get
+  - create
+  - update
+  - patch
+- apiGroups:
+  - serving.knative.dev
+  resources:
+  - services
+  verbs:
+  - get
+  - create
+  - update
+  - patch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: tekton-triggers-role-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: tekton-triggers-role
+subjects:
+- kind: ServiceAccount
+  name: tekton-trigger
+  namespace: cicd-system
+---
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: trigger-gateway
+  namespace: cicd-system
+spec:
+  template:
+    spec:
+      containers:
+      - args:
+        - --trigger-service=el-acr-trigger-listener
+        image: registry.cn-hangzhou.aliyuncs.com/knative-sample/gateway:master_c367a24a-20191213163657
+        ports:
+        - containerPort: 8080
+          name: http1
+---
+apiVersion: tekton.dev/v1alpha1
+kind: EventListener
+metadata:
+  name: acr-trigger-listener
+  namespace: cicd-system
+spec:
+  serviceAccountName: tekton-trigger
+  triggers:
+  - binding:
+      name: acr-trigger-pipelinebinding
+    template:
+      name: acr-triggertemplate
+---
+apiVersion: tekton.dev/v1alpha1
+kind: Pipeline
+metadata:
+  name: acr-trigger-pipeline
+  namespace: cicd-system
+spec:
+  params:
+  - description: The image full url
+    name: imageUrl
+  - description: The image tag
+    name: imageTag
+  - description: The image digest
+    name: imageDigest
+  - description: The knative service namespace
+    name: namespace
+  - description: The knative service name
+    name: ksvcname
+  tasks:
+  - name: deploy
+    params:
+    - name: imageUrl
+      value: $(params.imageUrl)
+    - name: imageTag
+      value: $(params.imageTag)
+    - name: imageDigest
+      value: $(params.imageDigest)
+    - name: ksvcname
+      value: $(params.ksvcname)
+    - name: namespace
+      value: $(params.namespace)
+    taskRef:
+      name: deploy
+---
+apiVersion: tekton.dev/v1alpha1
+kind: Task
+metadata:
+  annotations:
+    sidecar.istio.io/inject: "false"
+  name: deploy
+  namespace: cicd-system
+spec:
+  inputs:
+    params:
+    - description: The image full url
+      name: imageUrl
+    - description: The image tag
+      name: imageTag
+    - description: The image digest
+      name: imageDigest
+    - description: The knative service namespace
+      name: namespace
+    - description: The knative service name
+      name: ksvcname
+    - description: The knative service image digest
+      name: imageDigest
+  steps:
+  - args:
+    - -c
+    - |
+      echo "pre-deploy success!!"
+    command:
+    - sh
+    image: registry.cn-hangzhou.aliyuncs.com/knative-sample/alpine:3.10.3
+    name: pre-deploy
+  - args:
+    - --image=$(inputs.params.imageUrl):$(inputs.params.imageTag)
+    - --ksvcname=$(inputs.params.ksvcname)
+    - --namespace=$(inputs.params.namespace)
+    command:
+    - /deployer
+    image: registry.cn-hangzhou.aliyuncs.com/knative-sample/deployer:master_c367a24a-20191213155723
+    name: deploy
+  - args:
+    - -c
+    - |
+      echo "post-deploy success!!"
+    command:
+    - sh
+    image: registry.cn-hangzhou.aliyuncs.com/knative-sample/alpine:3.10.3
+    name: post-deploy
+---
+apiVersion: tekton.dev/v1alpha1
+kind: TriggerBinding
+metadata:
+  name: acr-trigger-pipelinebinding
+  namespace: cicd-system
+spec:
+  params:
+  - name: imageUrl
+    value: registry.$(body.repository.region).aliyuncs.com/$(body.repository.namespace)/$(body.repository.name)
+  - name: imageTag
+    value: $(body.push_data.tag)
+  - name: imageDigest
+    value: $(body.push_data.digest)
+  - name: namespace
+    value: $(header.Namespace)
+  - name: ksvcname
+    value: $(header.Ksvcname)
+---
+apiVersion: tekton.dev/v1alpha1
+kind: TriggerTemplate
+metadata:
+  name: acr-triggertemplate
+  namespace: cicd-system
+spec:
+  params:
+  - description: The image full url
+    name: imageUrl
+  - description: The image tag
+    name: imageTag
+  - description: The image digest
+    name: imageDigest
+  - description: The knative service namespace
+    name: namespace
+  - description: The knative service name
+    name: ksvcname
+  resourcetemplates:
+  - apiVersion: tekton.dev/v1alpha1
+    kind: PipelineRun
+    metadata:
+      name: acr-trigger-pipeline-run-$(uid)
+      namespace: cicd-system
+    spec:
+      params:
+      - name: imageUrl
+        value: $(params.imageUrl)
+      - name: imageTag
+        value: $(params.imageTag)
+      - name: imageDigest
+        value: $(params.imageDigest)
+      - name: ksvcname
+        value: $(params.ksvcname)
+      - name: namespace
+        value: $(params.namespace)
+      pipelineRef:
+        name: acr-trigger-pipeline
+      serviceAccount: tekton-trigger
+      timeout: 0h30m0s

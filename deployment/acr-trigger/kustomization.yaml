@@ -1,0 +1,9 @@
+resources:
+- role.yaml
+- gateway-ksvc.yaml
+- pipeline.yaml 
+- triggers.yaml
+- namespace.yaml
+
+namespace: cicd-system
+
